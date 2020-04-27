@@ -1,0 +1,27 @@
+ARG REGISTRY
+ARG GIT_TAG
+FROM ${REGISTRY}/pingdownloader:${GIT_TAG} as staging
+# place the software being delivered in a conspicuous, unix-correct location
+ARG PRODUCT
+ARG VERSION
+ARG DEVOPS_USER
+ARG DEVOPS_KEY
+COPY ["keys.gpg","/tmp"]
+RUN /get-bits.sh --product ${PRODUCT} \
+        --version ${VERSION} \
+        --devops-user ${DEVOPS_USER} \
+        --devops-key ${DEVOPS_KEY} \
+        --devops-app "pipeline-build-${PRODUCT}-${VERSION}" \
+        --verify-gpg-signature \
+	&& unzip /tmp/product.zip \
+        -d /tmp \
+        -x *.bat \
+        -x *.dll \
+        -x *.exe \
+        -x *.ini \
+        -x */printable_docs/* \
+        -x */docs/* \
+    && mv /tmp/${PRODUCT}-${VERSION} /opt/server
+
+FROM scratch
+COPY --from=staging ["/opt/","/opt/"]

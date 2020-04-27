@@ -1,0 +1,96 @@
+{
+    "latest": "10.0.2",
+    "versions": [
+        {
+            "version": "10.1.0-Beta",
+            "preferredShim": "alpine",
+            "shims": [
+                {
+                    "shim": "alpine",
+                    "preferredJVM": "az11",
+                    "jvms": [
+                        {
+                            "jvm": "az11",
+                            "build": true,
+                            "deploy": true
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "version": "10.0.2",
+            "preferredShim": "alpine",
+            "shims": [
+                {
+                    "shim": "alpine",
+                    "preferredJVM": "az11",
+                    "jvms": [
+                        {
+                            "jvm": "az11",
+                            "build": true,
+                            "deploy": true
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "version": "10.0.1",
+            "preferredShim": "alpine",
+            "shims": [
+                {
+                    "shim": "alpine",
+                    "preferredJVM": "az11",
+                    "jvms": [
+                        {
+                            "jvm": "az11",
+                            "build": false,
+                            "deploy": false
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "version": "9.3.3",
+            "preferredShim": "alpine",
+            "shims": [
+                {
+                    "shim": "alpine",
+                    "preferredJVM": "az11",
+                    "jvms": [
+                        {
+                            "jvm": "az11",
+                            "build": true,
+                            "deploy": true
+                        }
+                    ]
+                }
+            ],
+            "dependencies": [
+                {
+                    "product": "pingfederate-patch",
+                    "version": "9.3.3-P3"
+                }
+            ]
+        },
+        {
+            "version": "9.2.3",
+            "preferredShim": "alpine",
+            "shims": [
+                {
+                    "shim": "alpine",
+                    "preferredJVM": "az8",
+                    "jvms": [
+                        {
+                            "jvm": "az8",
+                            "build": false,
+                            "deploy": false
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

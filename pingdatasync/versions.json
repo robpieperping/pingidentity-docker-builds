@@ -1,0 +1,56 @@
+{
+    "latest":"8.0.0.1",
+    "versions":[
+        {   
+            "version": "8.1.0.0-EA",
+            "preferredShim": "alpine",
+            "shims":[
+                {
+                    "shim": "alpine",
+                    "preferredJVM": "az11",
+                    "jvms": [
+                        {
+                            "jvm": "az11",
+                            "build": true,
+                            "deploy": true
+                        }
+                    ]
+                }
+            ]
+        },
+        {   
+            "version": "8.0.0.1",
+            "preferredShim": "alpine",
+            "shims":[
+                {
+                    "shim": "alpine",
+                    "preferredJVM": "az11",
+                    "jvms": [
+                        {
+                            "jvm": "az11",
+                            "build": true,
+                            "deploy": true
+                        }
+                    ]
+                }
+            ]
+        },
+        {   
+            "version": "7.3.0.7",
+            "preferredShim": "alpine",
+            "shims":[
+                {
+                    "shim": "alpine",
+                    "preferredJVM": "az11",
+                    "jvms": [
+                        {
+                            "jvm": "az11",
+                            "build": false,
+                            "deploy": false
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

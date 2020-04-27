@@ -1,0 +1,1022 @@
+stages: 
+  - intialization
+  - foundation
+  - products
+  - test.smoke
+  - test.integration
+  - deploy
+  - cleanup
+
+################################################
+#                  INITIALIZATION
+################################################
+i.checks:
+  stage: intialization
+  script:
+    - pwd
+    - env
+    - echo $USER
+    - docker info
+    - docker-compose version
+    - git --version
+    - ci_scripts/if_readme_only.sh 
+    - gcloud --version
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      # - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+
+i.unmerged:
+  stage: intialization
+  script:
+    - ci_scripts/unmerged_changes.sh
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+
+################################################
+#                  FOUNDATION
+################################################
+f.pingfoundation:
+  stage: foundation
+  script:
+    - ci_scripts/cleanup_docker.sh full
+    - ci_scripts/build_foundation.sh
+  when: always
+  except:
+    variables:
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+
+f.pingdownloader:
+  stage: foundation
+  script:
+    - ci_scripts/build_downloader.sh
+    - ci_scripts/run_smoke.sh --product pingdownloader --version none --shim  none --jvm none
+  when: always
+  except:
+    variables:
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+
+d.pingdownloader:
+  stage: deploy
+  script:
+    - docker pull gcr.io/ping-gte/pingdownloader:${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHORT_SHA}
+    - docker tag gcr.io/ping-gte/pingdownloader:${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHORT_SHA} pingidentity/pingdownloader
+    - docker push pingidentity/pingdownloader
+  only:
+    refs:
+      - master
+      - tags
+    changes:
+      - pingdownloader/**/*
+      - ci_scripts/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip deploy\]/
+
+
+################################################
+#                  PRODUCTS
+################################################
+
+################################################
+#                  APACHE JMETER
+################################################
+b.apache-jmeter:
+  stage: products
+  script:
+    - ci_scripts/build_product.sh --product apache-jmeter
+  only:
+    changes:
+      - pingdownloader/**/*
+      - apache-jmeter/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+
+t.apache-jmeter:
+  stage: test.smoke
+  script:
+    - ci_scripts/run_smoke.sh --product apache-jmeter
+  only:
+    changes:
+      - pingdownloader/**/*
+      - apache-jmeter/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip tests\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip smoke\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+
+d.apache-jmeter:
+  stage: deploy
+  script:
+    - ci_scripts/deploy_product_to_registry.sh --registry docker.io/pingidentity --product apache-jmeter
+  only:
+    refs:
+      - master
+      - tags
+    changes:
+      - apache-jmeter/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip deploy\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+
+################################################
+#                  LDAP SDK
+################################################
+b.ldap-sdk-tools:
+  stage: products
+  script:
+    - ci_scripts/build_product.sh --product ldap-sdk-tools
+  only:
+    changes:
+      - pingdownloader/**/*
+      - ldap-sdk-tools/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+      
+t.ldap-sdk-tools:
+  stage: test.smoke
+  script:
+    - ci_scripts/run_smoke.sh --product ldap-sdk-tools
+  only:
+    changes:
+      - pingdownloader/**/*
+      - ldap-sdk-tools/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip tests\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip smoke\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+      
+d.ldap-sdk-tools:
+  stage: deploy
+  script:
+    - ci_scripts/deploy_product_to_registry.sh --registry docker.io/pingidentity --product ldap-sdk-tools
+  only:
+    refs:
+      - master
+      - tags
+    changes:
+      - ldap-sdk-tools/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip deploy\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+      
+################################################
+#                  PING ACCESS
+################################################
+b.pingaccess:
+  stage: products
+  script:
+    - ci_scripts/build_product.sh --product pingaccess
+  only:
+    changes:
+      - pingcommon/**/*
+      - pingdatacommon/**/*
+      - pingbase/**/*
+      - pingdownloader/**/*
+      - pingaccess/**/*
+      - pingdirectory/**/*
+      - pingfederate/**/*
+      - integration_tests/**/*
+      - pingjvm/*
+      - ci_scripts/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/      
+
+t.pingaccess:
+  stage: test.smoke
+  script:
+    - ci_scripts/run_smoke.sh --product pingaccess
+  only:
+    changes:
+      - pingaccess/**/*
+      - pingcommon/**/*
+      - pingbase/**/*
+      - pingdownloader/**/*
+      - pingjvm/*
+      - ci_scripts/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip tests\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip smoke\]/      
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+      
+d.pingaccess:
+  stage: deploy
+  script:
+    - ci_scripts/deploy_product_to_registry.sh --registry docker.io/pingidentity --product pingaccess
+  only:
+    refs:
+      - master
+      - tags
+    changes:
+      - pingaccess/**/*
+      - pingcommon/**/*
+      - pingbase/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip deploy\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+      
+################################################
+#                  PING CENTRAL
+################################################
+b.pingcentral:
+  stage: products
+  script:
+    - ci_scripts/build_product.sh --product pingcentral
+  only:
+    changes:
+      - pingcentral/**/*
+      - pingcommon/**/*
+      - pingbase/**/*
+      - pingdownloader/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+
+t.pingcentral:
+  stage: test.smoke
+  script:
+    - ci_scripts/run_smoke.sh --product pingcentral 
+  only:
+    changes:
+      - pingcentral/**/*
+      - pingcommon/**/*
+      - pingbase/**/*
+      - pingdownloader/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip tests\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip smoke\]/      
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+      
+d.pingcentral:
+  stage: deploy
+  script:
+    - ci_scripts/deploy_product_to_registry.sh --registry docker.io/pingidentity --product pingcentral
+  only:
+    refs:
+      - master
+      - tags
+    changes:
+      - pingcentral/**/*
+      - pingcommon/**/*
+      - pingbase/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip deploy\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+
+################################################
+#                  PING DIRECTORY
+################################################
+b.pingdirectory:
+  stage: products
+  script:
+    - ci_scripts/build_product.sh --product pingdirectory
+  only:
+    changes:
+      - pingcommon/**/*
+      - pingdatacommon/**/*
+      - pingbase/**/*
+      - pingdownloader/**/*
+      - pingaccess/**/*
+      - pingdatasync/**/*
+      - pingdirectory/**/*
+      - pingfederate/**/*
+      - integration_tests/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/      
+
+t.pingdirectory:
+  stage: test.smoke
+  script:
+    - ci_scripts/run_smoke.sh --product pingdirectory
+  only:
+    changes:
+      - pingdirectory/**/*
+      - pingcommon/**/*
+      - pingdatacommon/**/*
+      - pingbase/**/*
+      - pingdownloader/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip tests\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip smoke\]/      
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+
+d.pingdirectory:
+  stage: deploy
+  script:
+    - ci_scripts/deploy_product_to_registry.sh --registry docker.io/pingidentity --product pingdirectory
+  only:
+    refs:
+      - master
+      - tags
+    changes:
+      - pingdirectory/**/*
+      - pingcommon/**/*
+      - pingdatacommon/**/*
+      - pingbase/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/      
+      - $CI_COMMIT_MESSAGE =~ /\[skip deploy\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+
+################################################
+#                  PING DIRECTORY PROXY
+################################################
+b.pingdirectoryproxy:
+  stage: products
+  script:
+    - ci_scripts/build_product.sh --product pingdirectoryproxy
+  only:
+    changes:
+      - pingcommon/**/*
+      - pingdatacommon/**/*
+      - pingbase/**/*
+      - pingdownloader/**/*
+      - pingdirectory/**/*
+      - pingdirectoryproxy/**/*
+      - integration_tests/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/      
+
+t.pingdirectoryproxy:
+  stage: test.smoke
+  script:
+    - ci_scripts/run_smoke.sh --product pingdirectoryproxy
+  only:
+    changes:
+      - pingbase/**/*
+      - pingdownloader/**/*
+      - pingcommon/**/*
+      - pingdatacommon/**/*
+      - pingdirectoryproxy/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip tests\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip smoke\]/      
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+
+d.pingdirectoryproxy:
+  stage: deploy
+  script:
+    - ci_scripts/deploy_product_to_registry.sh --registry docker.io/pingidentity --product pingdirectoryproxy
+  only:
+    refs:
+      - master
+      - tags
+    changes:
+      - pingdirectoryproxy/**/*
+      - pingcommon/**/*
+      - pingdatacommon/**/*
+      - pingbase/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/      
+      - $CI_COMMIT_MESSAGE =~ /\[skip deploy\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+
+################################################
+#                  PING DATA CONSOLE
+################################################
+b.pingdataconsole:
+  stage: products
+  script:
+    - ci_scripts/build_product.sh --product pingdataconsole
+  only:
+    changes:
+      - pingdataconsole/**/*
+      - pingdownloader/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+
+t.pingdataconsole:
+  stage: test.smoke
+  script:
+    - ci_scripts/run_smoke.sh --product pingdataconsole
+  only:
+    changes:
+      - pingcommon/**/*
+      - pingdatacommon/**/*
+      - pingbase/**/*
+      - pingdownloader/**/*
+      - pingdataconsole/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip tests\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip smoke\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+
+d.pingdataconsole:
+  stage: deploy
+  script:
+    - ci_scripts/deploy_product_to_registry.sh --registry docker.io/pingidentity --product pingdataconsole
+  only:
+    refs:
+      - master
+      - tags
+    changes:
+      - pingdataconsole/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip deploy\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+
+################################################
+#                  PING DATA SYNC
+################################################
+b.pingdatasync:
+  stage: products
+  script:
+    - ci_scripts/build_product.sh --product pingdatasync
+  only:
+    changes:
+      - pingcommon/**/*
+      - pingdatacommon/**/*
+      - pingbase/**/*
+      - pingdownloader/**/*
+      - pingdatasync/**/*
+      - pingdirctory/**/*
+      - integration_tests/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      
+t.pingdatasync:
+  stage: test.smoke
+  script:
+    - ci_scripts/run_smoke.sh --product pingdatasync
+  only:
+    changes:
+      - pingcommon/**/*
+      - pingdatacommon/**/*
+      - pingbase/**/*
+      - pingdownloader/**/*
+      - pingdatasync/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip tests\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip smoke\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+      
+d.pingdatasync:
+  stage: deploy
+  script:
+    - ci_scripts/deploy_product_to_registry.sh --registry docker.io/pingidentity --product pingdatasync
+  only:
+    refs:
+      - master
+      - tags
+    changes:
+      - pingdatasync/**/*
+      - pingcommon/**/*
+      - pingdatacommon/**/*
+      - pingbase/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip deploy\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+
+################################################
+#                  PING DATA GOVERNANCE
+################################################
+b.pingdatagovernance:
+  stage: products
+  script:
+    - ci_scripts/build_product.sh --product pingdatagovernance
+  only:
+    changes:
+      - pingdatagovernance/**/*
+      - pingcommon/**/*
+      - pingdatacommon/**/*
+      - pingbase/**/*
+      - pingdownloader/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      
+t.pingdatagovernance:
+  stage: test.smoke
+  script:
+    - ci_scripts/run_smoke.sh --product pingdatagovernance
+  only:
+    changes:
+      - pingcommon/**/*
+      - pingdatacommon/**/*
+      - pingbase/**/*
+      - pingdownloader/**/*
+      - pingdatagovernance/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:    
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip tests\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip smoke\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+
+d.pingdatagovernance:
+  stage: deploy
+  script:
+    - ci_scripts/deploy_product_to_registry.sh --registry docker.io/pingidentity --product pingdatagovernance
+  only:
+    refs:
+      - master
+      - tags
+    changes:
+      - pingdatagovernance/**/*
+      - pingcommon/**/*
+      - pingdatacommon/**/*
+      - pingbase/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:    
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip deploy\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+
+################################################
+# PING DATA GOVERNANCE POLICY ADMINISTRATION POINT 
+################################################
+b.pingdatagovernancepap:
+  stage: products
+  script:
+    - ci_scripts/build_product.sh --product pingdatagovernancepap
+  only:
+    changes:
+      - pingdatagovernancepap/**/*
+      - pingcommon/**/*
+      - pingdatacommon/**/*
+      - pingbase/**/*
+      - pingdownloader/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+
+t.pingdatagovernancepap:
+  stage: test.smoke
+  script:
+    - ci_scripts/run_smoke.sh --product pingdatagovernancepap
+  only:
+    changes:
+      - pingcommon/**/*
+      - pingdatacommon/**/*
+      - pingbase/**/*
+      - pingdownloader/**/*
+      - pingdatagovernancepap/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:    
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip tests\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip smoke\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/    
+
+d.pingdatagovernancepap:
+  stage: deploy
+  script:
+    - ci_scripts/deploy_product_to_registry.sh --registry docker.io/pingidentity --product pingdatagovernancepap
+  only:
+    refs:
+      - master
+      - tags
+    changes:
+      - pingdatagovernancepap/**/*
+      - pingcommon/**/*
+      - pingdatacommon/**/*
+      - pingbase/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/      
+      - $CI_COMMIT_MESSAGE =~ /\[skip deploy\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+
+################################################
+#                  PING FEDERATE
+################################################
+b.pingfederate:
+  stage: products
+  script:
+    - ci_scripts/build_product.sh --product pingfederate
+  only:
+    changes:
+      - pingfederate/**/*
+      - pingbase/**/*
+      - pingcommon/**/*
+      - pingdatacommon/**/*
+      - pingaccess/**/*
+      - pingdirectory/**/*
+      - pingdownloader/**/*
+      - integration_tests/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      
+t.pingfederate:
+  stage: test.smoke
+  script:
+    - ci_scripts/run_smoke.sh --product pingfederate
+  only:
+    changes:
+      - pingfederate/**/*
+      - pingcommon/**/*
+      - pingbase/**/*
+      - pingdownloader/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip tests\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip smoke\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+
+d.pingfederate:
+  stage: deploy
+  script:
+    - ci_scripts/deploy_product_to_registry.sh --registry docker.io/pingidentity --product pingfederate
+  only:
+    refs:
+      - master
+      - tags
+    changes:
+      - pingfederate/**/*
+      - pingcommon/**/*
+      - pingbase/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip deploy\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+      
+################################################
+#                  PING TOOL KIT
+################################################
+b.pingtoolkit:
+  stage: products
+  script:
+    - ci_scripts/build_product.sh --product pingtoolkit
+  only:
+    changes:
+      - pingtoolkit/**/*
+      - pingcommon/**/*
+      - pingbase/**/*
+      - pingdownloader/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+
+t.pingtoolkit:
+  stage: test.smoke
+  script:
+    - ci_scripts/run_smoke.sh --product pingtoolkit --shim alpine
+  only:
+    changes:
+      - pingtoolkit/**/*
+      - pingcommon/**/*
+      - pingbase/**/*
+      - pingdownloader/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip tests\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip smoke\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+
+d.pingtoolkit:
+  stage: deploy
+  script:
+    - ci_scripts/deploy_product_to_registry.sh --registry docker.io/pingidentity --product pingtoolkit
+  only:
+    refs:
+      - master
+      - tags
+    changes:
+      - pingtoolkit/**/*
+      - pingcommon/**/*
+      - pingbase/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip deploy\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+      
+################################################
+#                  INTEGRATION TESTS
+################################################
+pa-pf-pd.latest:
+  stage: test.integration
+  script:
+    - ci_scripts/run_integration.sh pa-pf-pd.latest
+  only:
+    changes:
+      - integration_tests/**/*
+      - pingbase/**/*
+      - pingcommon/**/*
+      - pingdatacommon/**/*
+      - pingaccess/**/*
+      - pingdirectory/**/*
+      - pingfederate/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip tests\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip integration\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+
+pds-pd.latest:
+  stage: test.integration
+  script:
+    - ci_scripts/run_integration.sh pds-pd.latest
+  only:
+    changes:
+      - integration_tests/**/*
+      - pingbase/**/*
+      - pingcommon/**/*
+      - pingdatacommon/**/*
+      - pingdirectory/**/*
+      - pingdatasync/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip tests\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip integration\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+
+pdp-pd.latest:
+  stage: test.integration
+  script:
+    - ci_scripts/run_integration.sh pdp-pd.latest
+  only:
+    changes:
+      - integration_tests/**/*
+      - pingbase/**/*
+      - pingcommon/**/*
+      - pingdatacommon/**/*
+      - pingdirectory/**/*
+      - pingdatasync/**/*
+      - ci_scripts/*
+      - pingjvm/*
+      - .gitlab-ci.yml
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip tests\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip integration\]/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+
+d.github:
+  stage: deploy
+  script:
+    - git --version
+    - ci_scripts/push_to_github.sh
+    - ci_scripts/deploy_docs.sh
+  only:
+    refs:
+      - master
+      - tags
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip products\]/
+      - $CI_COMMIT_REF_NAME =~ /^\[skip deploy\]*/
+      - $PING_IDENTITY_SNAPSHOT =~ /--snapshot/
+      
+c.failure:
+  stage: cleanup
+  script:
+    - ci_scripts/cleanup_failure.sh
+  when: on_failure
+  except:
+    variables:
+      - $CI_COMMIT_REF_NAME =~ /^workspace.*/
+      - $CI_COMMIT_MESSAGE =~ /\[skip build\]/
+      - $CI_COMMIT_MESSAGE =~ /\[skip cleanup\]/
+
+# c.always:
+#   stage: cleanup
+#   script:
+#     - ci_scripts/cleanup_docker.sh full
+#   when: always
+#   except:
+#     variables:
+#       - $CI_COMMIT_REF_NAME =~ /^workspace.*/

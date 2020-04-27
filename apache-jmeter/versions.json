@@ -1,0 +1,22 @@
+{
+    "latest": "5.2.1",
+    "versions": [
+        {
+            "version": "5.2.1",
+            "preferredShim": "alpine",
+            "shims": [
+                {
+                    "shim": "alpine",
+                    "preferredJVM": "az8",
+                    "jvms": [
+                        {
+                            "jvm": "az8",
+                            "build": true,
+                            "deploy": true
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
